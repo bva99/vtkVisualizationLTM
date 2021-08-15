@@ -69,6 +69,11 @@ class VTKImageData2DBaseClass:
 
         Sublcasses should have a `camera` attribute of the type `vtk.vtkCamera`
         and a `renderWindow` attribute of the type `vtk.vtkRenderWindow`.
+
+        Arguments
+        ---------
+        val: float
+            Value greater than 0. to zoom the `camera` in (`val>1.`) or out (`val<1.`).
         """
         self.camera.Zoom(val)
         self.renderWindow.Render()
@@ -80,6 +85,12 @@ class VTKImageData2DBaseClass:
         Sublcasses should have a `camera` attribute of the type `vtk.vtkCamera`,
         a `renderWindow` attribute of the type `vtk.vtkRenderWindow` and a
         `camera_transform_mat` attribute of the type `vtk.vtkTransform`.
+
+        Arguments
+        ---------
+        translate_list: list
+            List of 3 floats. How much to translate the camera in the x, y
+            and z directions.
         """
         if (type(translate_list) != list) or (len(translate_list) != 3):
             raise ValueError(f"`translate_list` must be a list of size 3, not a " +
@@ -94,7 +105,6 @@ class VTKImageData2DBaseClass:
 
         Sublcasses should have a `renderWindowInteractor` attribute of the type
         `vtk.vtkRenderWindowInteractor`.
-        :return:
         """
         self.renderWindowInteractor.Interact()
 
@@ -104,6 +114,11 @@ class VTKImageData2DBaseClass:
 
         Subclasses should have a `pngWriter` attribute of the type
         `vtk.vtkPNGWriter`.
+
+        Arguments
+        ---------
+        file_name: str, default: "./mesh.vti"
+            Name of the save file.
         """
         self.pngWriter.SetFileName(file_name)
         self.pngWriter.Write()
@@ -119,6 +134,13 @@ class VTKImageData2DBaseClass:
 
         Sublcasses should have a `vtiWriter` attribute of the type
         `vtk.vtkXMLImageDataWriter`.
+
+        Arguments
+        ---------
+        file_name: str, default: "./mesh.vti"
+            Name of the save file.
+        binary: bool, default: True
+            Check whether to save as a binary (True) or an ASCII (False) file.
         """
         if binary:
             self.vtiWriter.SetDataModeToBinary()
@@ -174,10 +196,11 @@ class VTKImageData2DBaseClass:
 
     @origin.setter
     def origin(self, origin):
-        if (len(origin) < 1) or (len(origin) > 4):
+        if len(origin) not in [2, 3]:
             raise ValueError(f"`origin` should be a list of 2 or 3 values, not {len(origin)}")
         if len(origin) == 2:
             origin = origin + [0.]
+        origin[2] = 0.
         self._origin = origin
 
     @property
@@ -186,10 +209,11 @@ class VTKImageData2DBaseClass:
 
     @spacing.setter
     def spacing(self, spacing):
-        if (len(spacing) < 1) or (len(spacing) > 4):
+        if len(spacing) not in [2, 3]:
             raise ValueError(f"`spacing` should be a list of 2 or 3 values, not {len(spacing)}")
-        if len(spacing) == 2:
+        elif len(spacing) == 2:
             spacing = spacing + [0.]
+        spacing[2] = 0.
         self._spacing = spacing
 
     @property

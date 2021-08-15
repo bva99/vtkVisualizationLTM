@@ -10,6 +10,82 @@ class VTKImageData2DTopology(VTKImageData2DBaseClass):
     The vtkImageData type is the simplest form of VTK data type,
     defining a regular 2D grid of equal cells. It also referred to as
     uniform rectilinear grid.
+
+    Note that a "point" in VTK is equivalent to a Finite Element (FE) node
+    and a "cell" in VTK is equivalent to a FE element.
+
+    Attributes
+    ----------
+    background_color: list, default: [1., 1., 1.]
+        List of three float values for the background color. Default is white.
+    window_size: tuple, default: (1280, 720)
+        Tuple of two integers containing the dimensions of the display window, in pixels.
+    window_name: str, default: "Mesh Window"
+        Name of the display window.
+    origin: list, default: [0., 0., 0.]
+        List of the coordinates of the origin of the mesh. The coordinates are from
+        the view world. Index 0. is always set to 0.
+    domain_size: list, default: [1., 1.]
+        List of two floats, the dimensions of the design space.
+    nels: list, default: [10, 10]
+        List of two integers, the number of elements in the x and y directions, resp.
+    spacing: list, optional
+        List of three floats. `spacing[2]` is always 0. `spacing[0]` is the size
+        of the cells in the x direction, and `spacing[1]` is the size of the
+        cells in the y direction. The default is `spacing[i] = domain_size[i]/nels[i]`.
+    number_of_vals: int, default: 2
+        Number of different element color/opacity types, to be plotted.
+    colors: list of lists
+        List containing lists of RGB triplets, which should be floats between 0. and
+        1. The number of colors should be equal to `number_of_vals`.
+        If `number_of_vals <= 6`, then this values is optional and default colors
+        are chosen.
+    opacities: list, optional
+        List containing the opacities of each type of element. The length of
+        `opacities` should be equal to `number_of_vals`, corresponding to each
+        list of `colors`. Defaults to all opaque colors (1.).
+    values: np.ndarray, default: `np.zeros(number_of_vals, dtype=np.int64)`
+        Numpy array of 64 bit integers containing the index numbers relating each
+        element to a color. `values` should have a length equal to the total
+        number of elements in the mesh.
+    tot_nels: int
+        Total number of elements.
+    tot_points: int
+        Total number of points.
+    lookup_table: vtkLookupTable object
+        A VTK lookup table. It is used by mapper objects to map scalar values (in
+        this case, from `values`) to RGBA colors (in this case defined by `colors`
+        and `opacities`).
+    image_data: vtkImageData object
+        This object is the VTK representation of the mesh.
+    values_vtk: vtkArray object
+        This object is the VTK array of `values`.
+    image_dataPolyData: vtkPolyData object
+        This object is a polygonal representation of `image_data`. This is what the
+        GPU uses for rendering.
+    image_dataMapper: vtkMapper object
+        This object maps the polygonal data to the actor.
+    actor: vtkActor object
+        This object represents the polydata in a rendered scene.
+    renderer: vtkRenderer object
+        This object renders the actors to a scene.
+    renderWindow: vtkRenderWindow object
+        This object wraps several OS specific directives to generate a window.
+    camera: vtkCamera object
+        This object enables translations and rotations of the view camera.
+    camera_transform_mat: vtkTransform object
+        This object is a 4x4 matrix that allows for translations (implemented)
+        and rotations (not implemented) of the view camera.
+    windowToImage: vtkWindowToImageFilter object
+        This object gets the image shown in a vtkWindow as input.
+    pngWriter: vtkPNGWriter object
+        This object enables saving of the rendered scene to a png file.
+        For now only transparent backgrounds are implemented. But this might
+        require current GPUs, so it might become optional later on.
+    vtiWriter: vtkXMLImageDataWriter object
+        This object writes `image_data` as a .vti file.
+    renderWindowInteractor: vtkRenderWindowInteractor object
+        This object allows for control of the render window.
     """
 
     def __init__(self, *,
@@ -122,6 +198,13 @@ class VTKImageData2DTopology(VTKImageData2DBaseClass):
         self.renderWindowInteractor.Initialize()
 
     def update(self, values):
+        """Updates the rendered scene
+
+        Arguments
+        ---------
+        values: np.ndarray
+            Check the class docstring.
+        """
         if (not isinstance(values, np.ndarray)) and (values.ndim != 1) and (values.shape[0] != self.tot_nels):
             raise TypeError(f"`values` should be a 1D numpy.ndarray of size {self.tot_nels}, " +
                             f"not of type {type(values)} of size {values.shape[0]} and {values.ndim} dimensions.")
