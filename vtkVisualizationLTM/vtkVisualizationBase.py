@@ -122,6 +122,11 @@ class VTKImageData2DBaseClass:
         """
         self.pngWriter.SetFileName(file_name)
         self.pngWriter.Write()
+        self.windowToImage = vtk.vtkWindowToImageFilter()
+        self.windowToImage.SetInput(self.renderWindow)
+        self.windowToImage.SetInputBufferTypeToRGBA()  # record the alpha (transparency) channel
+        self.pngWriter = vtk.vtkPNGWriter()
+        self.pngWriter.SetInputConnection(self.windowToImage.GetOutputPort())
 
     def save_to_vtk(self, file_name="./mesh.vtk", binary=True):
         raise NotImplementedError(f"This method is not implemented yet. " +

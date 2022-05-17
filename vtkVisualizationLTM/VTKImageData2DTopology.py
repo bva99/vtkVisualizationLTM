@@ -1,7 +1,7 @@
 import numpy as np
 import vtk
 from vtk.util.numpy_support import numpy_to_vtk
-from vtkVisualizationLTM.vtkVisualizationBase import VTKImageData2DBaseClass, _global_colors_list
+from vtkVisualizationBase import VTKImageData2DBaseClass, _global_colors_list
 
 class VTKImageData2DTopology(VTKImageData2DBaseClass):
     """Class for plotting the topology of a 2D domain using the
@@ -106,7 +106,7 @@ class VTKImageData2DTopology(VTKImageData2DBaseClass):
         if (colors is None) and (number_of_vals < 7):
             colors = _global_colors_list[0:number_of_vals].copy()
         elif (colors is None) and (number_of_vals >= 7):
-            raise ValueError(f"Since `number_of_vals` is greater than 7, a valid list of" +
+            raise ValueError(f"Since `number_of_vals` is greater than 7, a valid list of " +
                              f"character RGB triplets must be given.")
         self.colors = colors
 
@@ -163,11 +163,11 @@ class VTKImageData2DTopology(VTKImageData2DBaseClass):
 
         self.renderWindow = vtk.vtkRenderWindow()
         self.renderWindow.AddRenderer(self.renderer)
-        self.renderWindow.SetWindowName(self.window_name)
         self.renderWindow.SetSize(self.window_size)
         self.renderWindow.AlphaBitPlanesOn()  # enable usage of alpha channel
         self.renderWindow.ShowCursor()
         self.renderWindow.Render()
+        self.renderWindow.SetWindowName(self.window_name)
 
         # get the camera
         self.camera = self.renderer.GetActiveCamera()

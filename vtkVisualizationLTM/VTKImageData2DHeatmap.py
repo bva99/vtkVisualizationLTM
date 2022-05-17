@@ -1,7 +1,7 @@
 import numpy as np
 import vtk
 from vtk.util.numpy_support import numpy_to_vtk
-from vtkVisualizationLTM.vtkVisualizationBase import VTKImageData2DBaseClass
+from vtkVisualizationBase import VTKImageData2DBaseClass
 from matplotlib.cm import ScalarMappable
 import warnings
 
@@ -44,6 +44,13 @@ class VTKImageData2DHeatmap(VTKImageData2DBaseClass):
         A numpy array of doubles (`dtype=np.float64` is required). These values
         are the heatmap values. The length of this array should be either equal
         to the total number of elements or to the total number of nodes.
+    mask_values: np.ndarray of type bool
+        A numpy array of True and False (`dtype=bool` is required). The length of
+        this array has to be the same as of `scalar_values`. The False values make
+        the corresponding scalar values have a white and transparent color. It is
+        used to hide certain values from the plot. The limits of the color map are
+        rescaled to only consider the minimum and maximum values of `scalar_values`
+        that have a corresponding value of True in `mask_values`.
     tot_nels: int
         Total number of elements.
     tot_points: int
@@ -88,7 +95,7 @@ class VTKImageData2DHeatmap(VTKImageData2DBaseClass):
     def __init__(self, *,
                  background_color=None, window_size=(1280, 720), window_name="Mesh Window",  # window properties
                  origin=None, domain_size=None, spacing=None, nels=None,  # ImageData properties:
-                 n_cbar_colors=256, cmap_str="viridis", scalar_values=None):
+                 n_cbar_colors=256, cmap_str="viridis", scalar_values=None, mask_values=None):
 
         super().__init__(background_color=background_color, window_size=window_size,
                          window_name=window_name, origin=origin, domain_size=domain_size,
@@ -111,9 +118,20 @@ class VTKImageData2DHeatmap(VTKImageData2DBaseClass):
                             f"not of type {type(scalar_values)} of size " +
                             f"{scalar_values.shape[0]} and {scalar_values.ndim} dimensions.")
         if isinstance(scalar_values, np.ndarray) and (scalar_values.dtype != np.float64):
-            print(f"WARNING: scalar_values should be composed of 64 bit floats.")
+            warnings.warn("`scalar_values` should be composed of 64 bit floats.", RuntimeWarning)
             scalar_values = scalar_values.astype(np.float64)
-        self.scalar_values = scalar_values
+        self.scalar_values = np.copy(scalar_values)
+
+        if mask_values is None:
+            mask_values = np.ones(scalar_values.shape[0], dtype=bool)
+        if (not isinstance(mask_values, np.ndarray)) and (mask_values.ndim != 1) \
+                and (mask_values.shape[0] != scalar_values.shape[0]):
+            raise TypeError(f"`mask_values` should be a 1D numpy.ndarray of size {self.scalar_values}, not of " +
+                            f"type {type(mask_values)} of size {mask_values.shape[0]} and {mask_values.ndim} dimensions.")
+        if mask_values.dtype != bool:
+            mask_values = mask_values.astype(bool)
+            warnings.warn("`mask_values` should be an ndarray of bool's. Converting.", RuntimeWarning)
+        self.mask_values = np.copy(mask_values)
 
         # define if cell data or point data are given
         if self.scalar_values.shape[0] == self.tot_points:
@@ -124,7 +142,14 @@ class VTKImageData2DHeatmap(VTKImageData2DBaseClass):
         # setup the lookup table
         self.lookup_table = vtk.vtkLookupTable()
         self.lookup_table.SetTable(self.colorsVTK)
-        self.lookup_table.SetRange(self.scalar_values.min(), self.scalar_values.max())
+        min_val = self.scalar_values[self.mask_values].min()
+        self.lookup_table.SetRange(min_val, self.scalar_values[self.mask_values].max())
+        self.lookup_table.SetBelowRangeColor(0., 0., 0., 0.)  # transparent white value for below range colors
+        self.lookup_table.UseBelowRangeColorOn()
+
+        # set scalar_value entries corresponding to False entries on mask_values
+        # equal to a value below the lookup table range color
+        self.scalar_values[~self.mask_values] = min_val - 1.
 
         # vtk scalar scalar_values
         self.scalar_values_vtk = numpy_to_vtk(self.scalar_values, deep=0, array_type=vtk.VTK_DOUBLE)
@@ -149,6 +174,16 @@ class VTKImageData2DHeatmap(VTKImageData2DBaseClass):
             self.image_dataMapper.SetScalarModeToUseCellData()
         self.image_dataMapper.SetLookupTable(self.lookup_table)
         self.image_dataMapper.UseLookupTableScalarRangeOn()
+
+        # define a coordinate object to keep track of the
+        # x limit of the imageData, so that the colorbar
+        # can be defined based on this value
+        # self.cBar_p1 = vtk.vtkCoordinate()
+        # self.cBar_p1.SetCoordinateSystemToWorld()
+        # self.cBar_p1.SetValue(self.domain_size[0]*1.02, 0.0, 0.0)
+        # self.cBar_p2 = vtk.vtkCoordinate()
+        # self.cBar_p2.SetCoordinateSystemToWorld()
+        # self.cBar_p2.SetValue(self.domain_size[0]*1.02, self.domain_size[1], 0.0)
 
         self.actor = vtk.vtkActor()  # an actor represents an object in rendered scene
         self.actor.SetMapper(self.image_dataMapper)
@@ -182,9 +217,9 @@ class VTKImageData2DHeatmap(VTKImageData2DBaseClass):
         # render window
         self.renderWindow = vtk.vtkRenderWindow()
         self.renderWindow.AddRenderer(self.renderer)
-        self.renderWindow.SetWindowName(self.window_name)
         self.renderWindow.SetSize(self.window_size)
         self.renderWindow.Render()
+        self.renderWindow.SetWindowName(self.window_name)
 
         # get the camera
         self.camera = self.renderer.GetActiveCamera()
@@ -214,12 +249,14 @@ class VTKImageData2DHeatmap(VTKImageData2DBaseClass):
         self.renderWindowInteractor.SetRenderWindow(self.renderWindow)
         self.renderWindowInteractor.Initialize()
 
-    def update(self, scalar_values):
+    def update(self, scalar_values, mask_values=None):
         """Updates the rendered scene
 
         Arguments
         ---------
         scalar_values: np.ndarray
+            Check the class docstring.
+        mask_values: np.ndarray
             Check the class docstring.
         """
         if (not isinstance(scalar_values, np.ndarray)) and (scalar_values.ndim != 1) \
@@ -229,7 +266,7 @@ class VTKImageData2DHeatmap(VTKImageData2DBaseClass):
                             f"not of type {type(scalar_values)} of size " +
                             f"{scalar_values.shape[0]} and {scalar_values.ndim} dimensions.")
         if isinstance(scalar_values, np.ndarray) and (scalar_values.dtype != np.float64):
-            print(f"WARNING: scalar_values should be composed of 64 bit floats.")
+            warnings.warn(f"WARNING: scalar_values should be composed of 64 bit floats.", RuntimeWarning)
             scalar_values = scalar_values.astype(np.float64)
         if (self._point_or_cell == "point") and (scalar_values.shape[0] == self.tot_nels):
             warnings.warn(f"Changing from showing a point data heatmap to a cell data heatmap " +
@@ -239,8 +276,23 @@ class VTKImageData2DHeatmap(VTKImageData2DBaseClass):
             warnings.warn(f"Changing from showing a cell data heatmap to a point data heatmap " +
                           f"is inefficient. Create a different visualization object.", RuntimeWarning)
             self._point_or_cell = "point"
-        self.scalar_values = scalar_values
-        self.lookup_table.SetRange(self.scalar_values.min(), self.scalar_values.max())
+        self.scalar_values = np.copy(scalar_values)
+
+        if mask_values is None:
+            mask_values = np.ones(scalar_values.shape[0], dtype=bool)
+        if (not isinstance(mask_values, np.ndarray)) and (mask_values.ndim != 1) \
+                and (mask_values.shape[0] != scalar_values.shape[0]):
+            raise TypeError(f"`mask_values` should be a 1D numpy.ndarray of size {self.scalar_values}, not of " +
+                            f"type {type(mask_values)} of size {mask_values.shape[0]} and {mask_values.ndim} dimensions.")
+        if mask_values.dtype != bool:
+            mask_values = mask_values.astype(bool)
+            warnings.warn("`mask_values` should be an ndarray of bool's. Converting.", RuntimeWarning)
+        self.mask_values = mask_values
+
+        min_val = self.scalar_values[self.mask_values].min()
+        self.lookup_table.SetRange(min_val, self.scalar_values[self.mask_values].max())
+        self.scalar_values[~self.mask_values] = min_val - 1.
+
         self.scalar_values_vtk = numpy_to_vtk(self.scalar_values, deep=0, array_type=vtk.VTK_DOUBLE)
         self.scalar_values_vtk.SetName("heatmapValues")
         if self._point_or_cell == "point":
