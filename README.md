@@ -64,6 +64,9 @@ Breno Vincenzo de Almeida [bva99](https://github.com/bva99)
 
 ## Version history
 
+- 0.2
+  - Added support for plotting nodal values to the heatmaps.
+
 - 0.1
   - Initial release.
   - Contains only classes for 2D visualization (topology and heatmaps).
